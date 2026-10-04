@@ -28,9 +28,8 @@ catch (error) {
 
 // HTTP headers to drop across HTTP/HTTPS and domain boundaries
 var sensitiveHeaders = [
-  "Authorization",
-  "Proxy-Authorization",
-  "Cookie",
+  "authorization",
+  "cookie",
 ];
 
 // URL fields to preserve in copy operations
@@ -114,10 +113,9 @@ function RedirectableRequest(options, responseCallback) {
     }
   };
 
-  // Create filter for sensitive HTTP headers
-  this._headerFilter = new RegExp("^(?:" +
-      sensitiveHeaders.concat(options.sensitiveHeaders).map(escapeRegex).join("|") +
-    ")$", "i");
+  // Collect sensitive HTTP header names
+  var headerNames = sensitiveHeaders.concat(options.sensitiveHeaders);
+  this._sensitiveHeaders = new Set(headerNames.map(toLowerCaseName));
 
   // Perform the first request
   this._performRequest();
@@ -496,7 +494,7 @@ RedirectableRequest.prototype._processResponse = function (response) {
      redirectUrl.protocol !== "https:" ||
      redirectUrl.host !== currentHost &&
      !isSubdomain(redirectUrl.host, currentHost)) {
-    removeMatchingHeaders(this._headerFilter, this._options.headers);
+    removeNamedHeaders(this._sensitiveHeaders, this._options.headers);
   }
 
   // Evaluate the beforeRedirect callback
@@ -648,6 +646,14 @@ function removeMatchingHeaders(regex, headers) {
     undefined : String(lastValue).trim();
 }
 
+function removeNamedHeaders(names, headers) {
+  for (var header in headers) {
+    if (names.has(header.toLowerCase())) {
+      delete headers[header];
+    }
+  }
+}
+
 function createErrorType(code, message, baseClass) {
   // Create constructor
   function CustomError(properties) {
@@ -709,8 +715,8 @@ function isURL(value) {
   return URL && value instanceof URL;
 }
 
-function escapeRegex(regex) {
-  return regex.replace(/[[\]\\/()*+?.^$|]/g, "\\$&");
+function toLowerCaseName(name) {
+  return String(name).toLowerCase();
 }
 
 // Exports
